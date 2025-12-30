@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/google/uuid"
 )
@@ -15,16 +16,20 @@ func (cfg *apiConfig) handlerThumbnailGet(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	tn, ok := videoThumbnails[videoID]
-	if !ok {
-		respondWithError(w, http.StatusNotFound, "Thumbnail not found", nil)
+	video, err := cfg.db.GetVideo(videoID)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't find video", err)
 		return
 	}
 
-	w.Header().Set("Content-Type", tn.mediaType)
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(tn.data)))
+	url := strings.Split(*video.ThumbnailURL, ";")
+	mediaType := strings.Split(url[0], ":")
+	data := strings.Split(url[1], ":")
 
-	_, err = w.Write(tn.data)
+	w.Header().Set("Content-Type", mediaType[1])
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data[1])))
+
+	_, err = w.Write([]byte(data[1]))
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error writing response", err)
 		return
