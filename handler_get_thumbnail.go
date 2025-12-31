@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"strings"
+	"os"
+	"path"
+	"path/filepath"
 
 	"github.com/google/uuid"
 )
@@ -22,14 +24,21 @@ func (cfg *apiConfig) handlerThumbnailGet(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	url := strings.Split(*video.ThumbnailURL, ";")
-	mediaType := strings.Split(url[0], ":")
-	data := strings.Split(url[1], ":")
+	filename := path.Base(*video.ThumbnailURL)
+	filepath := filepath.Join(cfg.assetsRoot, filename)
 
-	w.Header().Set("Content-Type", mediaType[1])
-	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(data[1])))
+	fileData, err := os.ReadFile(filepath)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't open image", err)
+		return
+	}
 
-	_, err = w.Write([]byte(data[1]))
+	mediaType := http.DetectContentType(fileData)
+
+	w.Header().Set("Content-Type", mediaType)
+	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(fileData)))
+
+	_, err = w.Write(fileData)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Error writing response", err)
 		return
