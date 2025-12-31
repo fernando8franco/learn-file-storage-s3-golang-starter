@@ -3,10 +3,10 @@ package main
 import (
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/bootdotdev/learn-file-storage-s3-golang-starter/internal/auth"
 	"github.com/google/uuid"
@@ -42,18 +42,30 @@ func (cfg *apiConfig) handlerUploadThumbnail(w http.ResponseWriter, r *http.Requ
 	}
 	defer thumbnailImg.Close()
 
-	mediaType := header.Header.Get("Content-Type")
-	if mediaType == "" {
+	contentType := header.Header.Get("Content-Type")
+	if contentType == "" {
 		respondWithError(w, http.StatusBadRequest, "Missing Content-Type for thumbnail", nil)
 		return
 	}
 
-	parts := strings.Split(mediaType, "/")
-	if len(parts) != 2 {
-		respondWithError(w, http.StatusBadRequest, "Invalid image type", nil)
+	var allowedMediaTypes = map[string]string{
+		"image/jpeg": "jpeg",
+		"image/png":  "png",
+	}
+
+	mediaType, _, err := mime.ParseMediaType(contentType)
+	if err != nil {
+		respondWithError(w, http.StatusBadRequest, "Couldn't parse media type", err)
 		return
 	}
-	thumbnail := fmt.Sprintf("%s.%s", videoIDString, parts[1])
+
+	extension, ok := allowedMediaTypes[mediaType]
+	if !ok {
+		respondWithError(w, http.StatusBadRequest, "Invalid media type", nil)
+		return
+	}
+
+	thumbnail := fmt.Sprintf("%s.%s", videoIDString, extension)
 	thumbnailFilepath := filepath.Join(cfg.assetsRoot, thumbnail)
 
 	file, err := os.Create(thumbnailFilepath)
